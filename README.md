@@ -10,7 +10,7 @@ NumConsumers		  3
 NumbOfEndpoints		1
 EndpointType		  Topic
 DeliveryMode		  NON_PERSISTENT
-PayLoadSize		    1
+PayLoadSize(Kb)		    1
 Duration		      100000000
 NumOfMessages		  100000000
 BrokerIP		      10.9.220.40
