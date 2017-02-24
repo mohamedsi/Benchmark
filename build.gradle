@@ -36,6 +36,8 @@ dependencies {
     compile("com.solacesystems:sol-jms:10.+")
     compile("org.apache.kafka:kafka-clients:0.10.1.0")
     compile("org.apache.kafka:kafka-streams:0.10.1.0")
+    compile("io.nats:jnats:1.+")
+    compile("io.nats:java-nats-streaming:0.4.1")
 }
 
 task createAllStartScripts() << {

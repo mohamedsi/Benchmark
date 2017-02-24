@@ -1,7 +1,7 @@
 package com.sbsa.benchmark;
 
 public enum Implementation {
-	Solace, SolaceClient, Kafka
+	Solace, SolaceClient, Kafka, NatsIO
 	
 	
 }

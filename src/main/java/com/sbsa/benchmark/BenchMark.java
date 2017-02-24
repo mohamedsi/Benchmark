@@ -7,6 +7,8 @@ import org.apache.commons.logging.LogFactory;
 
 import com.sbsa.benchmark.kafka.KafkaClientFactory;
 import com.sbsa.benchmark.kafka.KafkaClientMonitor;
+import com.sbsa.benchmark.natsio.NatsIOFactory;
+import com.sbsa.benchmark.natsio.NatsIOMonitor;
 import com.sbsa.benchmark.solace.SolFactory;
 import com.sbsa.benchmark.solace.SolMonitor;
 import com.sbsa.benchmark.solaceclient.SolClientFactory;
@@ -73,6 +75,11 @@ public class BenchMark {
 			monitor = new KafkaClientMonitor(this.runtimeProperties, factory);
 		}
 		break;
+		case NatsIO: {
+			factory = new NatsIOFactory(this.runtimeProperties);
+			monitor = new NatsIOMonitor(this.runtimeProperties, factory);
+		}
+			break;
 		default:
 			throw new RuntimeException("No Implmentation Set");
 		}
