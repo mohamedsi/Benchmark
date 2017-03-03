@@ -1,1 +1,1 @@
-SolaceClient 2 2 1 Topic NON_PERSISTENT 1 100000000 300000000 10.9.220.40 55555 Consumer
+java -jar Benchmark.jar SolaceClient 2 2 1 Topic NON_PERSISTENT 1 100000000 300000000 10.9.220.40 55555 Consumer
