@@ -36,7 +36,7 @@ public class NatsIOConsumer extends Consumer {
 	@Override
 	public void start() throws Exception {
 		con.subscribe((String) endpoint.getEndpoint(), new MessageHandler() {
-			public void onMessage(Message m) {
+			public void onMessage(final Message m) {
 				monitor.executor.execute(new Runnable() {
 					@Override
 					public void run() {

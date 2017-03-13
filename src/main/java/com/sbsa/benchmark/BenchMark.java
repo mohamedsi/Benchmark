@@ -39,10 +39,12 @@ public class BenchMark {
 		properties.put("BrokerIP", arg[9]);
 		properties.put("BrokerPort", arg[10]);
 
+		properties.put("SourceType", SourceType.valueOf(arg[11]));
+
 		return properties;
 	}
 
-	public static void main(String[] paramArrayOfString) throws Exception {
+	public static void main(String... paramArrayOfString) throws Exception {
 		if (paramArrayOfString.length < 1) {
 			System.exit(1);
 		}
@@ -69,12 +71,12 @@ public class BenchMark {
 			factory = new SolClientFactory(this.runtimeProperties);
 			monitor = new SolClientMonitor(this.runtimeProperties, factory);
 		}
-		break;
+			break;
 		case Kafka: {
 			factory = new KafkaClientFactory(this.runtimeProperties);
 			monitor = new KafkaClientMonitor(this.runtimeProperties, factory);
 		}
-		break;
+			break;
 		case NatsIO: {
 			factory = new NatsIOFactory(this.runtimeProperties);
 			monitor = new NatsIOMonitor(this.runtimeProperties, factory);
@@ -92,7 +94,16 @@ public class BenchMark {
 		monitor.start();
 
 		while (monitor.isBusy()) {
-			Thread.sleep(100);
+			try {
+				String output = System.console().readLine();
+				if (output != null && output.toUpperCase().trim().equals("EXPORT")) {
+					monitor.export();
+				} else if (output != null && output.toUpperCase().trim().equals("END")) {
+					monitor.stop();
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
 		}
 
 		return ReturnCode.SUCCESS;
