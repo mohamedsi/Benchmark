@@ -43,7 +43,7 @@ dependencies {
 task createAllStartScripts() << {
      // just a placeholder
 }
-  def scripts = []
+  def scripts = ['BenchMark':'com.sbsa.benchmark.BenchMark']
   scripts.each() { scriptName, className ->
           def t = tasks.create(name: scriptName+'StartScript', type: CreateStartScripts) {
         mainClassName = className
