@@ -54,7 +54,7 @@ public class KafkaClientConsumer extends Consumer {
 						ConsumerRecords<String, String> records = consumer.poll(10);
 						long recievedTime = System.nanoTime();
 						for (ConsumerRecord<String, String> record : records) {
-							recordStats(recievedTime, record.timestamp());
+							process(record.timestamp());
 						}
 					} catch (Exception e) {
 						System.out.println(e.getMessage());

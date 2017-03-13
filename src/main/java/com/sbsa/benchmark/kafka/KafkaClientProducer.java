@@ -36,7 +36,7 @@ public class KafkaClientProducer extends com.sbsa.benchmark.Producer {
 		producer.send(new ProducerRecord(((String) endpoint.getEndpoint()).replace("/", ""), null, startTime, "message", message));
 		endTime = System.nanoTime();
 
-		this.recordStats(startTime, endTime);
+		process();
 	}
 
 }

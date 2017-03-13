@@ -55,7 +55,7 @@ public class NatsIOProducer extends Producer {
 		con.publish((String)endpoint.getEndpoint(),convertToBytes(objectList));
 		endTime = System.nanoTime();
 		
-		this.recordStats(startTime, endTime);
+		process();
 	}
 	
 	private byte[] convertToBytes(Object object) throws IOException {

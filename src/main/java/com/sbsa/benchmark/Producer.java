@@ -8,6 +8,9 @@ public abstract class Producer implements Runnable {
 	protected LinkedBlockingDeque<Entry<Long, Long>> _stats = new LinkedBlockingDeque<>();
 	protected Monitor monitor;
 	protected Endpoint endpoint;
+	
+	public Long clientMsgsTx = 0L;
+	
 
 	public Producer(Monitor monitor, Endpoint endpoint) {
 		this.monitor = monitor;
@@ -21,7 +24,10 @@ public abstract class Producer implements Runnable {
 		statsCollector.start();
 	}
 
-
+	public void process(){
+		clientMsgsTx++;
+	}
+	
 	public abstract void publish(String Message) throws Exception;
 
 	public void recordStats(final long startTime, final long endTime) {
@@ -35,7 +41,7 @@ public abstract class Producer implements Runnable {
 			Entry<Long, Long> stat;
 			try {
 				stat = _stats.takeFirst();
-				monitor.PublisherCallback(stat.getKey(), stat.getValue());	
+				//monitor.PublisherCallback(stat.getKey(), stat.getValue());	
 			} catch (InterruptedException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();

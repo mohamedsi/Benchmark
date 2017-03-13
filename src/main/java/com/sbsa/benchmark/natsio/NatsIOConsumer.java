@@ -37,19 +37,13 @@ public class NatsIOConsumer extends Consumer {
 	public void start() throws Exception {
 		con.subscribe((String) endpoint.getEndpoint(), new MessageHandler() {
 			public void onMessage(final Message m) {
-				monitor.executor.execute(new Runnable() {
-					@Override
-					public void run() {
-						try {
-							long arrivalTime = System.nanoTime();
-							String message = ((String) convertFromBytes(m.getData()).toString()).replace("[","").replace("]","");
-							
-							recordStats(arrivalTime, Long.valueOf(message.split(",")[0]));
-						} catch (Exception e) {
-							e.printStackTrace();
-						}
-					}
-				});
+				String message;
+				try {
+					message = ((String) convertFromBytes(m.getData()).toString()).replace("[","").replace("]","");
+					process(Long.valueOf(message.split(",")[0]));
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
 			}
 		});
 	}

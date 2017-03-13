@@ -69,7 +69,7 @@ public class SolProducer extends Producer {
 
 		endTime = System.nanoTime();
 
-		this.recordStats(startTime, endTime);
+		process();
 	}
 
 }

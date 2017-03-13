@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -27,18 +28,25 @@ public abstract class Monitor {
 	protected Factory factory;
 	protected AtomicBoolean latch = new AtomicBoolean(Boolean.FALSE);
 	protected AtomicBoolean publisherLatch = new AtomicBoolean(Boolean.FALSE);
-	protected Snapshot metricsSnapshots = new Snapshot();
-	protected Snapshot previousMetricsSnapshots = new Snapshot();
-	protected List<Snapshot> snapshots = new ArrayList<Snapshot>();
+
+	Long[] cons1total;
+	Long bestMean = 0L;
+	Long worstMean = 0L;
 
 	private String messagePayload = null;
 
-	private AtomicInteger numberOfSnapShots = new AtomicInteger(0);
-	private int numOfMessages;
+	StringBuffer sb = new StringBuffer();
 
 	public Monitor(ConcurrentHashMap<String, Object> runtimeParamaters, Factory factory) {
 		this.runtimeParamaters = runtimeParamaters;
 		this.factory = factory;
+		if ((SourceType) runtimeParamaters.get("SourceType") == SourceType.Producer) {
+			sb.append("publishedMessagesPerSecond,numPublishers");
+			sb.append(System.getProperty("line.separator"));
+		} else {
+			sb.append("consumedMessagesPerSecond,currentMean,bestMean,worstMean,numConsumers");
+			sb.append(System.getProperty("line.separator"));
+		}
 	}
 
 	public boolean isBusy() {
@@ -48,11 +56,28 @@ public abstract class Monitor {
 	public void start() {
 		latch.set(Boolean.TRUE);
 		try {
-			System.out.println("Sleeping for 30 seconds to clear all queues");
-			Thread.sleep(30000);
+			if ((SourceType) runtimeParamaters.get("SourceType") == SourceType.Consumer) {
+				long sleep = 30000L;
+				System.out.println("Sleeping for "+String.valueOf(sleep/1000)+" seconds to clear all queues");
+				Thread.sleep(sleep);
+			}
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
+
+		if ((SourceType) runtimeParamaters.get("SourceType") == SourceType.Producer) {
+			cons1total = new Long[producers.size()];
+			for (int i = 0; i < producers.size(); i++) {
+				cons1total[i] = 0L;
+			}
+
+		} else {
+			cons1total = new Long[consumers.size()];
+			for (int i = 0; i < consumers.size(); i++) {
+				cons1total[i] = 0L;
+			}
+		}
+
 		startPublishers();
 		startMetricsMonitor();
 	}
@@ -63,138 +88,70 @@ public abstract class Monitor {
 			public void run() {
 				try {
 					if ((SourceType) runtimeParamaters.get("SourceType") == SourceType.Producer) {
-						if (metricsSnapshots.getNumberOfPublishedMessages() < numOfMessages) {
-							System.out.println("Snapping Metrics: " + numberOfSnapShots.get());
-							Snapshot tempMetricsSnapshots = new Snapshot();
-							snap(tempMetricsSnapshots);
+						int idx = 0;
+						Long aggRate = 0L;
+						Long tempMean = 0L;
+						Producer producerTest;
 
-							System.out.println("Number Of Messages Published: "
-									+ tempMetricsSnapshots.getNumberOfPublishedMessages());
-							System.out.println("Published Messages per Second / Producer: "
-									+ ((tempMetricsSnapshots.getNumberOfPublishedMessages()
-											- previousMetricsSnapshots.getNumberOfPublishedMessages())
-											/ producers.size()));
+						Iterator<Producer> iterator = producers.listIterator();
 
-							tempMetricsSnapshots
-									.setPublishedMessagesPerSecond(((tempMetricsSnapshots.getNumberOfPublishedMessages()
-											- previousMetricsSnapshots.getNumberOfPublishedMessages())
-											/ producers.size()));
-
-							storePreviousSnap(tempMetricsSnapshots);
-							numberOfSnapShots.incrementAndGet();
-						} else {
-							export();
-							if (metricsSnapshots.getNumberOfPublishedMessages() >= numOfMessages) {
-								latch.set(Boolean.FALSE);
-							}
+						while (iterator.hasNext()) {
+							producerTest = iterator.next();
+							aggRate += (producerTest.clientMsgsTx - cons1total[idx]);
+							cons1total[idx] = producerTest.clientMsgsTx;
+							idx++;
 						}
-					} else if ((SourceType) runtimeParamaters.get("SourceType") == SourceType.Consumer) {
-						if (metricsSnapshots.getNumberOfConsumerMessages() > 0) {
-							if ((metricsSnapshots.getNumberOfConsumerMessages() / consumers.size()) < numOfMessages) {
-								System.out.println("Snapping Metrics: " + numberOfSnapShots.get());
-								Snapshot tempMetricsSnapshots = new Snapshot();
-								snap(tempMetricsSnapshots);
-
-								System.out.println("Number Of Messages Consumed: "
-										+ tempMetricsSnapshots.getNumberOfConsumerMessages());
-								System.out.println("Average Pub/Sub Time (ms): "
-										+ (((tempMetricsSnapshots.getCumulativeConsumerTime())
-												/ tempMetricsSnapshots.getNumberOfConsumerMessages()) * 0.000001));
-								System.out.println("Consumed Messages per Second / Consumer: "
-										+ ((tempMetricsSnapshots.getNumberOfConsumerMessages()
-												- previousMetricsSnapshots.getNumberOfConsumerMessages())
-												/ consumers.size()));
-								tempMetricsSnapshots.setConsumedMessagesPerSecond(
-										((tempMetricsSnapshots.getNumberOfConsumerMessages()
-												- previousMetricsSnapshots.getNumberOfConsumerMessages())
-												/ consumers.size()));
-
-								storePreviousSnap(tempMetricsSnapshots);
-								numberOfSnapShots.incrementAndGet();
-							} else {
-								export();
-							}
-						}
+						System.out.println("Aggregate Publisher Rate : RX = " + (aggRate / producers.size()));
+						sb.append(String.valueOf(aggRate / producers.size()) + "," + producers.size());
+						sb.append(System.getProperty("line.separator"));
 					} else {
-						if (metricsSnapshots.getNumberOfPublishedMessages() < numOfMessages) {
-							if (metricsSnapshots.getNumberOfConsumerMessages() > 0) {
-								System.out.println("Snapping Metrics: " + numberOfSnapShots.get());
-								Snapshot tempMetricsSnapshots = new Snapshot();
-								snap(tempMetricsSnapshots);
+						int idx = 0;
+						Long aggRate = 0L;
+						Long tempMean = 0L;
+						Consumer consumerTest;
 
-								System.out.println("Number Of Messages Published: "
-										+ tempMetricsSnapshots.getNumberOfPublishedMessages() + " Consumed: "
-										+ tempMetricsSnapshots.getNumberOfConsumerMessages());
-								System.out.println("Average Pub/Sub Time (ms): "
-										+ (((tempMetricsSnapshots.getCumulativeConsumerTime())
-												/ tempMetricsSnapshots.getNumberOfConsumerMessages()) * 0.000001));
-								System.out.println("Published Messages per Second / Producer: "
-										+ ((tempMetricsSnapshots.getNumberOfPublishedMessages()
-												- previousMetricsSnapshots.getNumberOfPublishedMessages())
-												/ producers.size()));
-								System.out.println("Consumed Messages per Second / Consumer: "
-										+ ((tempMetricsSnapshots.getNumberOfConsumerMessages()
-												- previousMetricsSnapshots.getNumberOfConsumerMessages())
-												/ consumers.size()));
+						Iterator<Consumer> iterator = consumers.listIterator();
 
-								tempMetricsSnapshots.setPublishedMessagesPerSecond(
-										((tempMetricsSnapshots.getNumberOfPublishedMessages()
-												- previousMetricsSnapshots.getNumberOfPublishedMessages())
-												/ producers.size()));
-								tempMetricsSnapshots.setConsumedMessagesPerSecond(
-										((tempMetricsSnapshots.getNumberOfConsumerMessages()
-												- previousMetricsSnapshots.getNumberOfConsumerMessages())
-												/ consumers.size()));
-
-								storePreviousSnap(tempMetricsSnapshots);
-
-								numberOfSnapShots.incrementAndGet();
-							}
-						} else {
-							export();
-							if (metricsSnapshots.getNumberOfPublishedMessages() >= numOfMessages) {
-								latch.set(Boolean.FALSE);
+						while (iterator.hasNext()) {
+							consumerTest = iterator.next();
+							if (consumerTest.clientMsgsRx > 0) {
+								tempMean += consumerTest.clientStatsLatencyTotal / consumerTest.clientMsgsRx;
+								aggRate += (consumerTest.clientMsgsRx - cons1total[idx]);
+								cons1total[idx] = consumerTest.clientMsgsRx;
+								idx++;
 							}
 						}
+						tempMean = tempMean / consumers.size();
+
+						if (worstMean == 0l) {
+							worstMean = tempMean;
+						} else if (tempMean > worstMean) {
+							worstMean = tempMean;
+						}
+
+						if (bestMean == 0L) {
+							bestMean = tempMean;
+						} else if (bestMean > tempMean) {
+							bestMean = tempMean;
+						}
+
+						System.out.println("Aggregate Subscriber Rate : RX = " + (aggRate / consumers.size())
+								+ ", (Current) Mean = " + tempMean + "us, (Best) Mean = " + bestMean
+								+ "us, (Worst) Mean = " + worstMean + "us");
+						sb.append(String.valueOf(aggRate / consumers.size()) + "," + String.valueOf(tempMean) + ","
+								+ String.valueOf(bestMean) + "," + String.valueOf(worstMean) + "," + consumers.size());
+						sb.append(System.getProperty("line.separator"));
 					}
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
 			}
-
-			/**
-			 * @param tempMetricsSnapshots
-			 */
-			private void storePreviousSnap(Snapshot tempMetricsSnapshots) {
-				previousMetricsSnapshots.setCumulativeConsumerTime(tempMetricsSnapshots.getCumulativeConsumerTime());
-				previousMetricsSnapshots
-						.setNumberOfConsumerMessages(tempMetricsSnapshots.getNumberOfConsumerMessages());
-				previousMetricsSnapshots
-						.setCumulativeProducerEndTime(tempMetricsSnapshots.getCumulativeProducerEndTime());
-				previousMetricsSnapshots
-						.setNumberOfPublishedMessgaes(tempMetricsSnapshots.getNumberOfPublishedMessages());
-				previousMetricsSnapshots
-						.setCumulativeProducerSendTime(tempMetricsSnapshots.getCumulativeProducerSendTime());
-
-				snapshots.add(tempMetricsSnapshots);
-			}
-
-			/**
-			 * @param tempMetricsSnapshots
-			 */
-			private void snap(Snapshot tempMetricsSnapshots) {
-				tempMetricsSnapshots.setCumulativeConsumerTime(metricsSnapshots.getCumulativeConsumerTime());
-				tempMetricsSnapshots.setNumberOfConsumerMessages(metricsSnapshots.getNumberOfConsumerMessages());
-				tempMetricsSnapshots.setCumulativeProducerEndTime(metricsSnapshots.getCumulativeProducerEndTime());
-				tempMetricsSnapshots.setNumberOfPublishedMessgaes(metricsSnapshots.getNumberOfPublishedMessages());
-				tempMetricsSnapshots.setCumulativeProducerSendTime(metricsSnapshots.getCumulativeProducerSendTime());
-			}
 		}, 1, 1, TimeUnit.SECONDS);
+
 	}
 
 	private void startPublishers() {
 		messagePayload = createPayload();
-		numOfMessages = (int) runtimeParamaters.get("NumOfMessages");
 		publisherLatch.set(Boolean.TRUE);
 
 		for (final Producer producer : producers) {
@@ -202,8 +159,7 @@ public abstract class Monitor {
 				@Override
 				public void run() {
 					try {
-						while (isBusy() && publisherLatch.get()
-								&& metricsSnapshots.getNumberOfPublishedMessages() < numOfMessages) {
+						while (isBusy() && publisherLatch.get()) {
 							try {
 								producer.publish(messagePayload);
 							} catch (Exception e) {
@@ -246,8 +202,7 @@ public abstract class Monitor {
 	}
 
 	protected void createProducers() throws Exception {
-		if ((SourceType) runtimeParamaters.get("SourceType") == SourceType.Producer
-				|| (SourceType) runtimeParamaters.get("SourceType") == SourceType.ProducerConsumer) {
+		if ((SourceType) runtimeParamaters.get("SourceType") == SourceType.Producer) {
 			producers.clear();
 			for (String destination : destinations) {
 				Endpoint endpoint = factory.createEndPoint(destination);
@@ -259,8 +214,7 @@ public abstract class Monitor {
 	}
 
 	protected void createConsumers() throws Exception {
-		if ((SourceType) runtimeParamaters.get("SourceType") == SourceType.Consumer
-				|| (SourceType) runtimeParamaters.get("SourceType") == SourceType.ProducerConsumer) {
+		if ((SourceType) runtimeParamaters.get("SourceType") == SourceType.Consumer) {
 			consumers.clear();
 			int numberOfConsumers = (int) runtimeParamaters.get("NumConsumers");
 
@@ -281,50 +235,11 @@ public abstract class Monitor {
 		}
 	}
 
-	public void ConsumerCallback(final long arrivalTime, long publisherSendTime) {
-		if (publisherLatch.get()) {
-			this.metricsSnapshots.incrementNumberOfConsumerMessages();
-			this.metricsSnapshots.incrementCumulativeConsumerTime(arrivalTime - publisherSendTime);
-		}
-	}
-
-	public void PublisherCallback(final long startTime, final long endTime) {
-		if (publisherLatch.get()) {
-			this.metricsSnapshots.incrementNumberOfPublishedMessgaes();
-			this.metricsSnapshots.incrementCumulativeProducerSendTime(startTime);
-			this.metricsSnapshots.incrementCumulativeProducerEndTime(endTime);
-		}
-	}
-
 	/**
 	 * @throws IOException
 	 */
 	public void export() throws IOException {
 		// Stopping
-		StringBuffer sb = new StringBuffer();
-		sb.append(
-				"numPublishedMessages,numConsumedMessages,averagePubSubTime,publishedMessagesPerSecond,consumedMessagesPerSecond,numPublishers,numConsumers");
-		sb.append(System.getProperty("line.separator"));
-		for (Snapshot snapshot : snapshots) {
-
-			if ((SourceType) runtimeParamaters.get("SourceType") == SourceType.Consumer) {
-				sb.append(snapshot.getNumberOfPublishedMessages() + "," + snapshot.getNumberOfConsumerMessages() + ","
-						+ (((snapshot.getCumulativeConsumerTime()) / snapshot.getNumberOfConsumerMessages()) * 0.000001)
-						+ "," + snapshot.getPublishedMessagesPerSecond() + "," + snapshot.getConsumedMessagesPerSecond()
-						+ "," + producers.size() + "," + consumers.size());
-			} else if ((SourceType) runtimeParamaters.get("SourceType") == SourceType.Producer) {
-				sb.append(snapshot.getNumberOfPublishedMessages() + "," + snapshot.getNumberOfConsumerMessages() + ","
-						+ 0 + "," + snapshot.getPublishedMessagesPerSecond() + ","
-						+ snapshot.getConsumedMessagesPerSecond() + "," + producers.size() + "," + consumers.size());
-			} else {
-				sb.append(snapshot.getNumberOfPublishedMessages() + "," + snapshot.getNumberOfConsumerMessages() + ","
-						+ (((snapshot.getCumulativeConsumerTime()) / snapshot.getNumberOfConsumerMessages()) * 0.000001)
-						+ "," + snapshot.getPublishedMessagesPerSecond() + "," + snapshot.getConsumedMessagesPerSecond()
-						+ "," + producers.size() + "," + consumers.size());
-			}
-			sb.append(System.getProperty("line.separator"));
-		}
-
 		BufferedWriter bwr = new BufferedWriter(new FileWriter(
 				new File("./" + ((Implementation) runtimeParamaters.get("Implmentation")).toString() + ".csv")));
 		bwr.write(sb.toString());

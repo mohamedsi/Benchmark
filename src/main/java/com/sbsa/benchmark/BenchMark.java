@@ -102,7 +102,7 @@ public class BenchMark {
 					monitor.stop();
 				}
 			} catch (Exception e) {
-				e.printStackTrace();
+				//e.printStackTrace();
 			}
 		}
 

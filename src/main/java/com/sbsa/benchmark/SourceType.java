@@ -1,5 +1,5 @@
 package com.sbsa.benchmark;
 
 public enum SourceType {
-	Producer, Consumer, ProducerConsumer
+	Producer, Consumer
 }

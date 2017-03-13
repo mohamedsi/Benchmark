@@ -37,12 +37,7 @@ public class SolClientConsumer extends Consumer {
 			consumerQueue = ((JCSMPSession) endpoint.getSession()).createFlow(new XMLMessageListener() {
 				public void onReceive(final BytesXMLMessage message) {
 					message.ackMessage();
-					monitor.executor.execute(new Runnable() {
-						@Override
-						public void run() {
-							recordStats(System.nanoTime(), Long.parseLong(message.getCorrelationId()));
-						}
-					});
+					process(Long.parseLong(message.getCorrelationId()));
 				}
 
 				public void onException(JCSMPException e) {
@@ -54,12 +49,7 @@ public class SolClientConsumer extends Consumer {
 		case Topic: {
 			consumerTopic = ((JCSMPSession) endpoint.getSession()).getMessageConsumer(new XMLMessageListener() {
 				public void onReceive(final BytesXMLMessage message) {
-					monitor.executor.execute(new Runnable() {
-						@Override
-						public void run() {
-							recordStats(System.nanoTime(), Long.parseLong(message.getCorrelationId()));
-						}
-					});
+					process(Long.parseLong(message.getCorrelationId()));
 				}
 
 				public void onException(JCSMPException e) {

@@ -45,16 +45,12 @@ public class SolConsumer extends Consumer implements MessageListener {
 
 	@Override
 	public void onMessage(final Message message) {
-		this.monitor.executor.execute(new Runnable() {
-			@Override
-			public void run() {
-				try {
-					recordStats(System.nanoTime(), Long.parseLong(message.getJMSCorrelationID()));
-				} catch (JMSException e) {
-					e.printStackTrace();
-				}
-			}
-		});
+		try {
+			process(Long.parseLong(message.getJMSCorrelationID()));
+		} catch (NumberFormatException | JMSException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
 	}
 
 }
