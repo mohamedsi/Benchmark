@@ -23,6 +23,14 @@ public abstract class Consumer {
 		}
 	}
 
+	protected void process(Long arrivalTime, Long sentTime) {
+		if (monitor.publisherLatch.get()) {
+			Latency = (arrivalTime - sentTime) / 1000;
+			clientMsgsRx++;
+			clientStatsLatencyTotal += Latency;
+		}
+	}
+	
 	protected void recordStats(final long arrivalTime, final long publisherSendTime) {
 		this.monitor.executor.execute(new Runnable() {
 			@Override

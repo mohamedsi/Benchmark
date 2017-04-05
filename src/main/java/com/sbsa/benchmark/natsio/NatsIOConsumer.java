@@ -37,10 +37,11 @@ public class NatsIOConsumer extends Consumer {
 	public void start() throws Exception {
 		con.subscribe((String) endpoint.getEndpoint(), new MessageHandler() {
 			public void onMessage(final Message m) {
+				Long arrivalTime = System.nanoTime();
 				String message;
 				try {
 					message = ((String) convertFromBytes(m.getData()).toString()).replace("[","").replace("]","");
-					process(Long.valueOf(message.split(",")[0]));
+					process(arrivalTime, Long.valueOf(message.split(",")[0]));
 				} catch (Exception e) {
 					e.printStackTrace();
 				}

@@ -30,6 +30,8 @@ public class SolClientFactory extends Factory {
 		properties.setProperty(JCSMPProperties.HOST, (String) runtimeParamaters.get("BrokerIP"));
 		properties.setProperty(JCSMPProperties.VPN_NAME, "default");
 		properties.setProperty(JCSMPProperties.USERNAME, "clientUsername");
+		properties.setProperty(JCSMPProperties.MESSAGE_CALLBACK_ON_REACTOR, true);
+		
 	}
 
 	private JCSMPSession createSession() throws JCSMPException {
